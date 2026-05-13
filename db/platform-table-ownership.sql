@@ -13,6 +13,10 @@
 \dt consent_requests
 \dt consent_audit_log
 
+\connect hospital_a_db
+\dt hospital_a_op_consults
+\dt hospital_a_patients
+
 \connect notification_audit_db
 \dt ehr_exchange_log
 \dt patient_push_notifications

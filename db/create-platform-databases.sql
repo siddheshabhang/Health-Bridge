@@ -13,7 +13,17 @@ WHERE NOT EXISTS (
     SELECT 1 FROM pg_database WHERE datname = 'consent_db'
 )\gexec
 
+SELECT 'CREATE DATABASE hospital_a_db'
+WHERE NOT EXISTS (
+    SELECT 1 FROM pg_database WHERE datname = 'hospital_a_db'
+)\gexec
+
 SELECT 'CREATE DATABASE notification_audit_db'
 WHERE NOT EXISTS (
     SELECT 1 FROM pg_database WHERE datname = 'notification_audit_db'
+)\gexec
+
+SELECT 'CREATE DATABASE fhir_main'
+WHERE NOT EXISTS (
+    SELECT 1 FROM pg_database WHERE datname = 'fhir_main'
 )\gexec

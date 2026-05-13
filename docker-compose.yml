@@ -1,0 +1,496 @@
+services:
+  discovery-server:
+    build:
+      context: .
+      dockerfile: services/discovery-server/Dockerfile
+    image: health-bridge/discovery-server:local
+    container_name: health-bridge-discovery-server
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8761
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - health-bridge
+
+  api-gateway-service:
+    build:
+      context: .
+      dockerfile: services/api-gateway-service/Dockerfile
+    image: health-bridge/api-gateway-service:local
+    container_name: health-bridge-api-gateway-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+    ports:
+      - "8080:8080"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - health-bridge
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    image: health-bridge/frontend:local
+    container_name: health-bridge-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      api-gateway-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  frontend-hospital-a:
+    build:
+      context: .
+      dockerfile: frontend-hospital-a/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    image: health-bridge/frontend-hospital-a:local
+    container_name: health-bridge-frontend-hospital-a
+    ports:
+      - "5174:80"
+    depends_on:
+      api-gateway-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  frontend-hospital-b:
+    build:
+      context: .
+      dockerfile: frontend-hospital-b/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    image: health-bridge/frontend-hospital-b:local
+    container_name: health-bridge-frontend-hospital-b
+    ports:
+      - "5175:80"
+    depends_on:
+      api-gateway-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  auth-identity-service:
+    build:
+      context: .
+      dockerfile: services/auth-identity-service/Dockerfile
+    image: health-bridge/auth-identity-service:local
+    container_name: health-bridge-auth-identity-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8081
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      AUTH_IDENTITY_DB_URL: jdbc:postgresql://auth-identity-db:5432/auth_identity_db
+      AUTH_IDENTITY_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      AUTH_IDENTITY_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8081:8081"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      auth-identity-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - health-bridge
+
+  consent-service:
+    build:
+      context: .
+      dockerfile: services/consent-service/Dockerfile
+    image: health-bridge/consent-service:local
+    container_name: health-bridge-consent-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8082
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      CONSENT_DB_URL: jdbc:postgresql://consent-db:5432/consent_db
+      CONSENT_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      CONSENT_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8082:8082"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      consent-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - health-bridge
+
+  notification-audit-service:
+    build:
+      context: .
+      dockerfile: services/notification-audit-service/Dockerfile
+    image: health-bridge/notification-audit-service:local
+    container_name: health-bridge-notification-audit-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8087
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      NOTIFICATION_AUDIT_DB_URL: jdbc:postgresql://notification-audit-db:5432/notification_audit_db
+      NOTIFICATION_AUDIT_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      NOTIFICATION_AUDIT_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-before-service-splitting}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8087:8087"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      notification-audit-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8087/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - health-bridge
+
+  hospital-a-service:
+    build:
+      context: .
+      dockerfile: services/hospital-a-service/Dockerfile
+    image: health-bridge/hospital-a-service:local
+    container_name: health-bridge-hospital-a-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8083
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      HOSPITAL_A_DB_URL: jdbc:postgresql://hospital-a-db:5432/hospital_a_db
+      HOSPITAL_A_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      HOSPITAL_A_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      NOTIFICATION_AUDIT_SERVICE_URL: http://notification-audit-service:8087
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-before-service-splitting}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8083:8083"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      hospital-a-db:
+        condition: service_healthy
+      notification-audit-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks:
+      - health-bridge
+
+  hospital-b-service:
+    build:
+      context: .
+      dockerfile: services/hospital-b-service/Dockerfile
+    image: health-bridge/hospital-b-service:local
+    container_name: health-bridge-hospital-b-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8084
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      HOSPITAL_B_SUPPORT_DB_URL: jdbc:postgresql://notification-audit-db:5432/notification_audit_db
+      HOSPITAL_B_SUPPORT_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      HOSPITAL_B_SUPPORT_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      HOSPITAL_B_MONGO_URI: mongodb://hospital-b-mongodb:27017
+      HOSPITAL_B_MONGO_DATABASE: hospital_b
+      HOSPITAL_B_MONGO_AUTO_INDEX_CREATION: true
+      NOTIFICATION_AUDIT_SERVICE_URL: http://notification-audit-service:8087
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-before-service-splitting}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8084:8084"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      notification-audit-db:
+        condition: service_healthy
+      hospital-b-mongodb:
+        condition: service_healthy
+      notification-audit-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks:
+      - health-bridge
+
+  hie-fhir-exchange-service:
+    build:
+      context: .
+      dockerfile: services/hie-fhir-exchange-service/Dockerfile
+    image: health-bridge/hie-fhir-exchange-service:local
+    container_name: health-bridge-hie-fhir-exchange-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8086
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      HIE_SUPPORT_DB_URL: jdbc:postgresql://hie-support-db:5432/fhir_main
+      HIE_SUPPORT_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      HIE_SUPPORT_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      HOSPITAL_B_MONGO_URI: mongodb://hospital-b-mongodb:27017
+      HOSPITAL_B_MONGO_DATABASE: hospital_b
+      HOSPITAL_B_MONGO_AUTO_INDEX_CREATION: true
+      AUTH_IDENTITY_BASE_URL: http://auth-identity-service:8081
+      CONSENT_SERVICE_BASE_URL: http://consent-service:8082
+      HOSPITAL_A_SERVICE_BASE_URL: http://hospital-a-service:8083
+      HOSPITAL_B_SERVICE_BASE_URL: http://hospital-b-service:8084
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8086:8086"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      hie-support-db:
+        condition: service_healthy
+      hospital-b-mongodb:
+        condition: service_healthy
+      auth-identity-service:
+        condition: service_healthy
+      consent-service:
+        condition: service_healthy
+      hospital-a-service:
+        condition: service_healthy
+      hospital-b-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8086/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+    networks:
+      - health-bridge
+
+  admin-reporting-service:
+    build:
+      context: .
+      dockerfile: services/admin-reporting-service/Dockerfile
+    image: health-bridge/admin-reporting-service:local
+    container_name: health-bridge-admin-reporting-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8088
+      EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
+      ADMIN_REPORTING_DB_URL: jdbc:postgresql://notification-audit-db:5432/notification_audit_db
+      ADMIN_REPORTING_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
+      ADMIN_REPORTING_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+      JPA_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
+    ports:
+      - "8088:8088"
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+      notification-audit-db:
+        condition: service_healthy
+      notification-audit-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks:
+      - health-bridge
+
+  auth-identity-db:
+    image: postgres:16-alpine
+    container_name: health-bridge-auth-identity-db
+    environment:
+      POSTGRES_DB: auth_identity_db
+      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+    ports:
+      - "${AUTH_IDENTITY_DB_PORT:-5433}:5432"
+    volumes:
+      - auth_identity_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d auth_identity_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  consent-db:
+    image: postgres:16-alpine
+    container_name: health-bridge-consent-db
+    environment:
+      POSTGRES_DB: consent_db
+      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+    ports:
+      - "${CONSENT_DB_PORT:-5434}:5432"
+    volumes:
+      - consent_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d consent_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  hospital-a-db:
+    image: postgres:16-alpine
+    container_name: health-bridge-hospital-a-db
+    environment:
+      POSTGRES_DB: hospital_a_db
+      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+    ports:
+      - "${HOSPITAL_A_DB_PORT:-5435}:5432"
+    volumes:
+      - hospital_a_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d hospital_a_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  notification-audit-db:
+    image: postgres:16-alpine
+    container_name: health-bridge-notification-audit-db
+    environment:
+      POSTGRES_DB: notification_audit_db
+      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+    ports:
+      - "${NOTIFICATION_AUDIT_DB_PORT:-5436}:5432"
+    volumes:
+      - notification_audit_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d notification_audit_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  hie-support-db:
+    image: postgres:16-alpine
+    container_name: health-bridge-hie-support-db
+    environment:
+      POSTGRES_DB: fhir_main
+      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
+    ports:
+      - "${HIE_SUPPORT_DB_PORT:-5437}:5432"
+    volumes:
+      - hie_support_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d fhir_main"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+  hospital-b-mongodb:
+    image: mongo:7
+    container_name: health-bridge-hospital-b-mongodb
+    ports:
+      - "${HOSPITAL_B_MONGO_PORT:-27017}:27017"
+    volumes:
+      - hospital_b_mongo_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - health-bridge
+
+networks:
+  health-bridge:
+    name: health-bridge
+
+volumes:
+  auth_identity_db_data:
+  consent_db_data:
+  hospital_a_db_data:
+  notification_audit_db_data:
+  hie_support_db_data:
+  hospital_b_mongo_data:
