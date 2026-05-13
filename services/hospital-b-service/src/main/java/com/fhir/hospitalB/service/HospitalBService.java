@@ -12,6 +12,7 @@ import com.fhir.hospitalB.repository.HospitalBOPConsultRepository;
 import com.fhir.hospitalB.repository.HospitalBPatientRepository;
 import com.fhir.notification.PatientPushNotification;
 import com.fhir.notification.PatientPushNotificationRepository;
+import com.fhir.notification.NotificationAuditClient;
 import com.fhir.consent.service.ConsentStore;
 import com.fhir.shared.audit.AuditService;
 import com.fhir.shared.validation.FHIRValidatorBundle;
@@ -49,6 +50,9 @@ public class HospitalBService {
 
     @Autowired
     private PatientPushNotificationRepository pushNotificationRepository;
+
+    @Autowired
+    private NotificationAuditClient notificationAuditClient;
 
     @Autowired
     private ConsentStore consentStore;
@@ -307,6 +311,7 @@ public class HospitalBService {
         notification.setFhirBundleHash(auditService.hashPayload(payload));
         notification.setRead(false);
         pushNotificationRepository.save(notification);
+        notificationAuditClient.createPatientPushNotification(notification);
 
         return payload;
     }
