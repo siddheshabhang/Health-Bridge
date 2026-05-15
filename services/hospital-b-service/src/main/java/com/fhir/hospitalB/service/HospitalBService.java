@@ -24,8 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
+import java.time.Instant;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -139,6 +141,51 @@ public class HospitalBService {
 
     public List<HospitalBOPConsultEntity> getConsultsByAbhaId(String abhaId) {
         return consultRepository.findByAbhaIdOrderByReceivedAtDesc(abhaId);
+    }
+
+    public Optional<HospitalBPatient> findPatient(String identifier) {
+        return patientRepository.findByPatientId(identifier)
+                .or(() -> patientRepository.findByAbhaId(identifier));
+    }
+
+    public HospitalBPatient linkPatient(
+            String localPatientId,
+            String abhaId,
+            String fullName,
+            String dateOfBirth,
+            String gender) {
+        HospitalBPatient patient = patientRepository.findByPatientId(localPatientId)
+                .orElseGet(HospitalBPatient::new);
+        patient.setPatientId(localPatientId);
+        patient.setAbhaId(abhaId);
+        patient.setFullName(fullName);
+        patient.setDateOfBirth(dateOfBirth);
+        patient.setGender(gender);
+        Instant now = Instant.now();
+        if (patient.getCreatedAt() == null) {
+            patient.setCreatedAt(now);
+        }
+        patient.setUpdatedAt(now);
+        return patientRepository.save(patient);
+    }
+
+    public boolean hasConsults(String abhaId) {
+        return consultRepository.findFirstByAbhaIdOrderByReceivedAtDesc(abhaId).isPresent();
+    }
+
+    public List<InternalConsultationSummary> getInternalConsultationSummaries(String abhaId) {
+        return getConsultsByAbhaId(abhaId).stream()
+                .map(consult -> new InternalConsultationSummary(
+                        "HB-" + consult.getId(),
+                        "Metro Medical Center",
+                        consult.getDoctor(),
+                        consult.getConsultDate(),
+                        consult.getReceivedAt() != null ? consult.getReceivedAt().toString() : null,
+                        consult.getClinicalNotes(),
+                        consult.getBloodPressure(),
+                        consult.getTemperature(),
+                        hasText(consult.getPrescriptionPdfBase64())))
+                .toList();
     }
 
     /**
@@ -255,6 +302,10 @@ public class HospitalBService {
         return value == null || value.isBlank();
     }
 
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     // ── Patient-Initiated Push ───────────────────────────────────────────────
 
     /**
@@ -338,5 +389,17 @@ public class HospitalBService {
         notification.setRead(true);
         notification.setReadAt(java.time.Instant.now());
         return pushNotificationRepository.save(notification);
+    }
+
+    public record InternalConsultationSummary(
+            String id,
+            String hospitalName,
+            String doctorName,
+            String visitDate,
+            String recordedAt,
+            String clinicalNotes,
+            String bloodPressure,
+            String temperature,
+            boolean prescriptionAvailable) {
     }
 }

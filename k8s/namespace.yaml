@@ -1,0 +1,18 @@
+# health-bridge namespaces
+# Phase 8 — Kubernetes, Ingress & Secrets
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: health-bridge
+  labels:
+    app.kubernetes.io/part-of: health-bridge
+    phase: "8"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: health-bridge-observability
+  labels:
+    app.kubernetes.io/part-of: health-bridge
+    phase: "9"

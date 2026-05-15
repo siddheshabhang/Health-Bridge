@@ -1,0 +1,81 @@
+# notification-audit-service Deployment
+# Phase 8 — M1 MacBook Air resources: 128Mi/256Mi, 100m/250m
+# Image: siddheshhh/health-bridge-notification-audit-service:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-audit-service
+  namespace: health-bridge
+  labels:
+    app: notification-audit-service
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-audit-service
+  template:
+    metadata:
+      labels:
+        app: notification-audit-service
+    spec:
+      containers:
+        - name: notification-audit-service
+          image: siddheshhh/health-bridge-notification-audit-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8087
+          env:
+            - name: SERVER_PORT
+              value: "8087"
+            - name: NOTIFICATION_AUDIT_DB_URL
+              value: "jdbc:postgresql://notification-audit-db:5432/notification_audit_db"
+            - name: NOTIFICATION_AUDIT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_USER
+            - name: NOTIFICATION_AUDIT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          envFrom:
+            - configMapRef:
+                name: eureka-config
+            - configMapRef:
+                name: cors-config
+            - configMapRef:
+                name: service-urls-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8087
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8087
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            failureThreshold: 5

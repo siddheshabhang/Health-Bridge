@@ -15,11 +15,16 @@ import java.util.Set;
 @Component
 public class HIPFhirClientImpl implements HIPFhirClient {
 
+    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
+
     @Value("${hospital-a.service.base-url:http://localhost:8083}")
     private String hospitalAServiceBaseUrl;
 
     @Value("${hospital-b.service.base-url:http://localhost:8084}")
     private String hospitalBServiceBaseUrl;
+
+    @Value("${app.internal.service-token}")
+    private String internalServiceToken;
 
     public String pullBundle(String hip, String patientId, String consentToken, Set<String> scope) {
         if ("HospitalA".equalsIgnoreCase(hip)) {
@@ -41,6 +46,7 @@ public class HIPFhirClientImpl implements HIPFhirClient {
             return RestClient.create(baseUrl)
                     .post()
                     .uri(path)
+                    .headers(headers -> headers.set(INTERNAL_TOKEN_HEADER, internalServiceToken))
                     .body(new PullBundleRequest(patientId, consentToken, scope))
                     .retrieve()
                     .body(String.class);

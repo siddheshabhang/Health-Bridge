@@ -27,6 +27,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -126,6 +127,50 @@ public class HospitalAService {
     @Transactional(readOnly = true)
     public List<HospitalAOPConsultEntity> getConsultsByAbhaId(String abhaId) {
         return consultRepository.findByAbhaIdOrderByCreatedAtDesc(abhaId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<HospitalAPatient> findPatient(String identifier) {
+        return patientRepository.findById(identifier)
+                .or(() -> patientRepository.findByAbhaId(identifier));
+    }
+
+    @Transactional
+    public HospitalAPatient linkPatient(
+            String localPatientId,
+            String abhaId,
+            String fullName,
+            String dateOfBirth,
+            String gender) {
+        HospitalAPatient patient = patientRepository.findById(localPatientId)
+                .orElseGet(HospitalAPatient::new);
+        patient.setPatientId(localPatientId);
+        patient.setAbhaId(abhaId);
+        patient.setName(fullName);
+        patient.setDob(dateOfBirth);
+        patient.setGender(gender);
+        return patientRepository.save(patient);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasConsults(String abhaId) {
+        return consultRepository.findFirstByAbhaIdOrderByIdDesc(abhaId).isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<InternalConsultationSummary> getInternalConsultationSummaries(String abhaId) {
+        return getConsultsByAbhaId(abhaId).stream()
+                .map(consult -> new InternalConsultationSummary(
+                        "HA-" + consult.getId(),
+                        "City General Hospital",
+                        consult.getDoctorName(),
+                        consult.getVisitDate(),
+                        consult.getCreatedAt() != null ? consult.getCreatedAt().toString() : null,
+                        consult.getSymptoms(),
+                        consult.getBloodPressure(),
+                        Double.toString(consult.getTemperature()),
+                        hasText(consult.getPrescriptionPdfBase64())))
+                .toList();
     }
 
     // ── Patient-Initiated Push ───────────────────────────────────────────────
@@ -284,6 +329,10 @@ public class HospitalAService {
         return value == null || value.isBlank();
     }
 
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     /**
      * Maps a persisted {@link HospitalAOPConsultEntity} back to a DTO so it
      * can be converted to a FHIR bundle.
@@ -430,5 +479,17 @@ public class HospitalAService {
         return fhirContext.newJsonParser()
             .setPrettyPrint(true)
             .encodeResourceToString(bundle);
+    }
+
+    public record InternalConsultationSummary(
+            String id,
+            String hospitalName,
+            String doctorName,
+            String visitDate,
+            String recordedAt,
+            String clinicalNotes,
+            String bloodPressure,
+            String temperature,
+            boolean prescriptionAvailable) {
     }
 }

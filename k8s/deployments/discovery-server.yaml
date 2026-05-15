@@ -1,0 +1,57 @@
+# discovery-server Deployment
+# Phase 8 — M1 MacBook Air resources: 128Mi/256Mi, 100m/250m
+# Image: siddheshhh/health-bridge-discovery-server:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-server
+  namespace: health-bridge
+  labels:
+    app: discovery-server
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: discovery-server
+  template:
+    metadata:
+      labels:
+        app: discovery-server
+    spec:
+      containers:
+        - name: discovery-server
+          image: siddheshhh/health-bridge-discovery-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8761
+          env:
+            - name: SERVER_PORT
+              value: "8761"
+            - name: EUREKA_SERVER_URL
+              value: "http://discovery-server:8761/eureka/"
+          envFrom:
+            - configMapRef:
+                name: eureka-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8761
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8761
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 5

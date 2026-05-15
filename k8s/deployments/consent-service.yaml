@@ -1,0 +1,76 @@
+# consent-service Deployment
+# Phase 8 — M1 MacBook Air resources: 128Mi/256Mi, 100m/250m
+# Image: siddheshhh/health-bridge-consent-service:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consent-service
+  namespace: health-bridge
+  labels:
+    app: consent-service
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consent-service
+  template:
+    metadata:
+      labels:
+        app: consent-service
+    spec:
+      containers:
+        - name: consent-service
+          image: siddheshhh/health-bridge-consent-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8082
+          env:
+            - name: SERVER_PORT
+              value: "8082"
+            - name: CONSENT_DB_URL
+              value: "jdbc:postgresql://consent-db:5432/consent_db"
+            - name: CONSENT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_USER
+            - name: CONSENT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: JWT_SECRET
+          envFrom:
+            - configMapRef:
+                name: eureka-config
+            - configMapRef:
+                name: cors-config
+            - configMapRef:
+                name: service-urls-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8082
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8082
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            failureThreshold: 5

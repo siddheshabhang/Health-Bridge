@@ -13,7 +13,7 @@ services:
       - "8761:8761"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 40s
@@ -35,12 +35,6 @@ services:
     depends_on:
       discovery-server:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 40s
     networks:
       - health-bridge
 
@@ -56,13 +50,7 @@ services:
       - "5173:80"
     depends_on:
       api-gateway-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+        condition: service_started
     networks:
       - health-bridge
 
@@ -78,13 +66,7 @@ services:
       - "5174:80"
     depends_on:
       api-gateway-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+        condition: service_started
     networks:
       - health-bridge
 
@@ -100,13 +82,7 @@ services:
       - "5175:80"
     depends_on:
       api-gateway-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
+        condition: service_started
     networks:
       - health-bridge
 
@@ -125,6 +101,7 @@ services:
       AUTH_IDENTITY_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
       JPA_DDL_AUTO: update
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-before-service-splitting}
       CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
     ports:
       - "8081:8081"
@@ -135,7 +112,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 60s
@@ -167,7 +144,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 60s
@@ -200,7 +177,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8087/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 60s
@@ -236,7 +213,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 90s
@@ -277,7 +254,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 90s
@@ -294,27 +271,18 @@ services:
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8086
       EUREKA_SERVER_URL: http://discovery-server:8761/eureka/
-      HIE_SUPPORT_DB_URL: jdbc:postgresql://hie-support-db:5432/fhir_main
-      HIE_SUPPORT_DB_USERNAME: ${POSTGRES_USER:-fhir_user}
-      HIE_SUPPORT_DB_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
-      HOSPITAL_B_MONGO_URI: mongodb://hospital-b-mongodb:27017
-      HOSPITAL_B_MONGO_DATABASE: hospital_b
-      HOSPITAL_B_MONGO_AUTO_INDEX_CREATION: true
       AUTH_IDENTITY_BASE_URL: http://auth-identity-service:8081
       CONSENT_SERVICE_BASE_URL: http://consent-service:8082
       HOSPITAL_A_SERVICE_BASE_URL: http://hospital-a-service:8083
       HOSPITAL_B_SERVICE_BASE_URL: http://hospital-b-service:8084
-      JPA_DDL_AUTO: update
+      NOTIFICATION_AUDIT_SERVICE_BASE_URL: http://notification-audit-service:8087
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-256-bit-base64-secret-in-prod-at-least-32-chars}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-me-before-service-splitting}
       CORS_ALLOWED_ORIGIN_PATTERNS: http://localhost:5173,http://localhost:5174,http://localhost:5175
     ports:
       - "8086:8086"
     depends_on:
       discovery-server:
-        condition: service_healthy
-      hie-support-db:
-        condition: service_healthy
-      hospital-b-mongodb:
         condition: service_healthy
       auth-identity-service:
         condition: service_healthy
@@ -324,12 +292,8 @@ services:
         condition: service_healthy
       hospital-b-service:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8086/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 120s
+      notification-audit-service:
+        condition: service_healthy
     networks:
       - health-bridge
 
@@ -358,12 +322,6 @@ services:
         condition: service_healthy
       notification-audit-service:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8088/actuator/health | grep -q '\"status\":\"UP\"'"]
-      interval: 15s
-      timeout: 5s
-      retries: 10
-      start_period: 90s
     networks:
       - health-bridge
 
@@ -380,7 +338,7 @@ services:
       - auth_identity_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d auth_identity_db"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -400,7 +358,7 @@ services:
       - consent_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d consent_db"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -420,7 +378,7 @@ services:
       - hospital_a_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d hospital_a_db"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -440,27 +398,7 @@ services:
       - notification_audit_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d notification_audit_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-    networks:
-      - health-bridge
-
-  hie-support-db:
-    image: postgres:16-alpine
-    container_name: health-bridge-hie-support-db
-    environment:
-      POSTGRES_DB: fhir_main
-      POSTGRES_USER: ${POSTGRES_USER:-fhir_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fhir_pass}
-    ports:
-      - "${HIE_SUPPORT_DB_PORT:-5437}:5432"
-    volumes:
-      - hie_support_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fhir_user} -d fhir_main"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -476,7 +414,7 @@ services:
       - hospital_b_mongo_data:/data/db
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping').ok\" | grep -q 1"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -492,5 +430,4 @@ volumes:
   consent_db_data:
   hospital_a_db_data:
   notification_audit_db_data:
-  hie_support_db_data:
   hospital_b_mongo_data:

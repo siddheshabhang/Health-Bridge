@@ -1,0 +1,13 @@
+# Eureka Discovery Config
+# Phase 8 — Kubernetes, Ingress & Secrets
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eureka-config
+  namespace: health-bridge
+  labels:
+    app.kubernetes.io/part-of: health-bridge
+data:
+  EUREKA_SERVER_URL: "http://discovery-server:8761/eureka/"
+  SPRING_PROFILES_ACTIVE: "docker"

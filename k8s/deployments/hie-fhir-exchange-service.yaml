@@ -1,0 +1,70 @@
+# hie-fhir-exchange-service Deployment
+# Largest service — HAPI FHIR R4 validation runs here
+# Phase 8 — M1 MacBook Air resources: 256Mi/512Mi, 150m/300m
+# Image: siddheshhh/health-bridge-hie-fhir-exchange-service:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hie-fhir-exchange-service
+  namespace: health-bridge
+  labels:
+    app: hie-fhir-exchange-service
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hie-fhir-exchange-service
+  template:
+    metadata:
+      labels:
+        app: hie-fhir-exchange-service
+    spec:
+      containers:
+        - name: hie-fhir-exchange-service
+          image: siddheshhh/health-bridge-hie-fhir-exchange-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8086
+          env:
+            - name: SERVER_PORT
+              value: "8086"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          envFrom:
+            - configMapRef:
+                name: eureka-config
+            - configMapRef:
+                name: cors-config
+            - configMapRef:
+                name: service-urls-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "150m"
+            limits:
+              memory: "512Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8086
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8086
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 5

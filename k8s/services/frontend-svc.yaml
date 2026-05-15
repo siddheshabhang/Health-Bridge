@@ -1,0 +1,50 @@
+# Frontend ClusterIP Services
+# Phase 8 — Kubernetes, Ingress & Secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: health-bridge
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-hospital-a
+  namespace: health-bridge
+  labels:
+    app: frontend-hospital-a
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  selector:
+    app: frontend-hospital-a
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-hospital-b
+  namespace: health-bridge
+  labels:
+    app: frontend-hospital-b
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  selector:
+    app: frontend-hospital-b
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

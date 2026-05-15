@@ -1,0 +1,92 @@
+# auth-identity-db — PostgreSQL StatefulSet + Service
+# Phase 8 — M1 MacBook Air resources: 128Mi/256Mi, 100m/250m
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: auth-identity-db
+  namespace: health-bridge
+  labels:
+    app: auth-identity-db
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  serviceName: auth-identity-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-identity-db
+  template:
+    metadata:
+      labels:
+        app: auth-identity-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: auth_identity_db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d auth_identity_db
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d auth_identity_db
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          volumeMounts:
+            - name: auth-identity-db-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: auth-identity-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-identity-db
+  namespace: health-bridge
+  labels:
+    app: auth-identity-db
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  selector:
+    app: auth-identity-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None  # Headless for StatefulSet stable DNS

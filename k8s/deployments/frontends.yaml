@@ -1,0 +1,137 @@
+# Frontend Deployments — all three React apps served by NGINX
+# Phase 8 — M1 MacBook Air resources: 32Mi/64Mi, 50m/100m each
+# Images: siddheshhh/health-bridge-frontend:latest
+#         siddheshhh/health-bridge-frontend-hospital-a:latest
+#         siddheshhh/health-bridge-frontend-hospital-b:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: health-bridge
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: siddheshhh/health-bridge-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-hospital-a
+  namespace: health-bridge
+  labels:
+    app: frontend-hospital-a
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-hospital-a
+  template:
+    metadata:
+      labels:
+        app: frontend-hospital-a
+    spec:
+      containers:
+        - name: frontend-hospital-a
+          image: siddheshhh/health-bridge-frontend-hospital-a:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-hospital-b
+  namespace: health-bridge
+  labels:
+    app: frontend-hospital-b
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-hospital-b
+  template:
+    metadata:
+      labels:
+        app: frontend-hospital-b
+    spec:
+      containers:
+        - name: frontend-hospital-b
+          image: siddheshhh/health-bridge-frontend-hospital-b:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15

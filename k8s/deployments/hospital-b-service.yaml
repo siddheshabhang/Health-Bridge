@@ -1,0 +1,87 @@
+# hospital-b-service Deployment
+# Phase 8 — M1 MacBook Air resources: 192Mi/384Mi, 100m/250m
+# Image: siddheshhh/health-bridge-hospital-b-service:latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hospital-b-service
+  namespace: health-bridge
+  labels:
+    app: hospital-b-service
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hospital-b-service
+  template:
+    metadata:
+      labels:
+        app: hospital-b-service
+    spec:
+      containers:
+        - name: hospital-b-service
+          image: siddheshhh/health-bridge-hospital-b-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8084
+          env:
+            - name: SERVER_PORT
+              value: "8084"
+            - name: HOSPITAL_B_SUPPORT_DB_URL
+              value: "jdbc:postgresql://notification-audit-db:5432/notification_audit_db"
+            - name: HOSPITAL_B_SUPPORT_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_USER
+            - name: HOSPITAL_B_SUPPORT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_PASSWORD
+            - name: HOSPITAL_B_MONGO_URI
+              value: "mongodb://hospital-b-mongodb:27017"
+            - name: HOSPITAL_B_MONGO_DATABASE
+              value: "hospital_b"
+            - name: HOSPITAL_B_MONGO_AUTO_INDEX_CREATION
+              value: "true"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: INTERNAL_SERVICE_TOKEN
+          envFrom:
+            - configMapRef:
+                name: eureka-config
+            - configMapRef:
+                name: cors-config
+            - configMapRef:
+                name: service-urls-config
+          resources:
+            requests:
+              memory: "192Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8084
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8084
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 5

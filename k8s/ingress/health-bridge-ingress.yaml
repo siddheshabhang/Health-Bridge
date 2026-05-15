@@ -1,0 +1,81 @@
+# NGINX Ingress — health-bridge
+# Phase 8 — Kubernetes, Ingress & Secrets
+#
+# Prerequisites:
+#   minikube addons enable ingress
+#
+# Path routing:
+#   /              → frontend (main portal)
+#   /hospital-a    → frontend-hospital-a
+#   /hospital-b    → frontend-hospital-b
+#   /api           → api-gateway-service (rewritten: /api/foo → /foo)
+#   /eureka        → discovery-server (admin monitoring)
+#
+# NOTE: The rewrite-target annotation strips the path prefix before forwarding.
+# React apps must be built with VITE_BASE set appropriately, or the default
+# root-relative build works because NGINX rewrites /hospital-a/* → /* before
+# the request reaches the frontend container.
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: health-bridge-ingress
+  namespace: health-bridge
+  labels:
+    app.kubernetes.io/part-of: health-bridge
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Strip path prefix so backends receive clean paths
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          # API Gateway — /api/auth/login → gateway receives /auth/login
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: api-gateway-service
+                port:
+                  number: 8080
+
+          # Hospital A frontend — /hospital-a/ → frontend-hospital-a receives /
+          - path: /hospital-a(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend-hospital-a
+                port:
+                  number: 80
+
+          # Hospital B frontend — /hospital-b/ → frontend-hospital-b receives /
+          - path: /hospital-b(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend-hospital-b
+                port:
+                  number: 80
+
+          # Eureka dashboard — admin only (remove in production)
+          - path: /eureka(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: discovery-server
+                port:
+                  number: 8761
+
+          # Main portal — must be last (catch-all)
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

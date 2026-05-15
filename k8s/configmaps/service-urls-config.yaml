@@ -1,0 +1,21 @@
+# Inter-Service URLs Config
+# Phase 8 — Kubernetes, Ingress & Secrets
+#
+# Kubernetes DNS: <service-name>.<namespace>.svc.cluster.local
+# Short form works within the same namespace: <service-name>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-urls-config
+  namespace: health-bridge
+  labels:
+    app.kubernetes.io/part-of: health-bridge
+data:
+  AUTH_IDENTITY_BASE_URL: "http://auth-identity-service:8081"
+  CONSENT_SERVICE_BASE_URL: "http://consent-service:8082"
+  HOSPITAL_A_SERVICE_BASE_URL: "http://hospital-a-service:8083"
+  HOSPITAL_B_SERVICE_BASE_URL: "http://hospital-b-service:8084"
+  NOTIFICATION_AUDIT_SERVICE_URL: "http://notification-audit-service:8087"
+  NOTIFICATION_AUDIT_SERVICE_BASE_URL: "http://notification-audit-service:8087"
+  JPA_DDL_AUTO: "update"

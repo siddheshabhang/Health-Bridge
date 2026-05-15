@@ -3,14 +3,12 @@ package com.fhir.hie.service;
 import com.fhir.consent.dto.ConsentRequestViewDTO;
 import com.fhir.consent.dto.InitiateConsentDTO;
 import com.fhir.consent.model.ConsentStatus;
+import com.fhir.hie.client.AuthIdentityClient;
+import com.fhir.hie.client.HospitalDataClient;
 import com.fhir.hie.client.HIPFhirClient;
+import com.fhir.hie.client.NotificationAuditClient;
 import com.fhir.hie.dto.ExchangeRequestDTO;
 import com.fhir.hie.dto.ExchangeResponseDTO;
-import com.fhir.identity.service.IdentityService;
-import com.fhir.hospitalA.repository.HospitalAOPConsultRepository;
-import com.fhir.hospitalB.repository.HospitalBOPConsultRepository;
-import com.fhir.notification.NotificationService;
-import com.fhir.shared.audit.AuditService;
 import com.fhir.shared.security.SecurityContextHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,13 +29,11 @@ import java.time.Instant;
 @Service
 public class HIEGatewayService {
 
-    @Autowired private IdentityService identityService;
-    @Autowired private NotificationService notificationService;
+    @Autowired private AuthIdentityClient authIdentityClient;
+    @Autowired private HospitalDataClient hospitalDataClient;
+    @Autowired private NotificationAuditClient notificationAuditClient;
     @Autowired private HIPFhirClient hipFhirClient;
-    @Autowired private AuditService auditService;
     @Autowired private SecurityContextHelper securityContextHelper;
-    @Autowired private HospitalAOPConsultRepository hospitalAOPConsultRepository;
-    @Autowired private HospitalBOPConsultRepository hospitalBOPConsultRepository;
 
     @Value("${consent.service.base-url:http://localhost:8082}")
     private String consentServiceBaseUrl;
@@ -46,7 +42,7 @@ public class HIEGatewayService {
         String requesterId = securityContextHelper.getCurrentUsername();
 
         // Step 1: Identity resolution
-        if (!identityService.exists(request.getPatientId())) {
+        if (!authIdentityClient.patientExists(request.getPatientId())) {
             return ExchangeResponseDTO.builder()
                 .status("IDENTITY_NOT_FOUND")
                 .message("Patient " + request.getPatientId() +
@@ -86,8 +82,7 @@ public class HIEGatewayService {
         ConsentRequestViewDTO consent = initiateConsentInConsentService(initiateDTO);
 
         // Step 4: Notify patient
-        notificationService.notifyPatientConsentRequest(
-            request.getPatientId(), consent.getId());
+        notificationAuditClient.notifyConsentRequest(request.getPatientId(), consent.getId());
 
         return ExchangeResponseDTO.builder()
             .status("CONSENT_PENDING")
@@ -144,7 +139,7 @@ public class HIEGatewayService {
         initiateDTO.setRequestedDataTypes(request.getScope());
 
         ConsentRequestViewDTO consent = initiateConsentInConsentService(initiateDTO);
-        notificationService.notifyPatientConsentRequest(request.getPatientId(), consent.getId());
+        notificationAuditClient.notifyConsentRequest(request.getPatientId(), consent.getId());
 
         return ExchangeResponseDTO.builder()
             .status("CONSENT_PENDING")
@@ -208,7 +203,8 @@ public class HIEGatewayService {
         Set<String> strictGrantedTypes = grantedTypes(latestConsent);
         String consentToken = latestConsent.getConsentToken();
 
-        Long auditId = auditService.logPending(
+        Long auditId = notificationAuditClient.logPendingTransfer(
+            new NotificationAuditClient.PendingTransferAuditRequest(
             request.getPatientId(),
             request.getHip(),
             request.getHiu(),
@@ -218,13 +214,13 @@ public class HIEGatewayService {
             0,
             strictGrantedTypes.toString(),
             "PULL"
-        );
+        ));
 
         try {
             String fhirBundle = hipFhirClient.pullBundle(
                 request.getHip(), request.getPatientId(), consentToken, strictGrantedTypes);
 
-            auditService.markSuccess(auditId, fhirBundle, countBundleResources(fhirBundle));
+            notificationAuditClient.markTransferSuccess(auditId, fhirBundle, countBundleResources(fhirBundle));
             System.out.println("✅ HIE Gateway: Successfully pulled FHIR bundle. Length: " + fhirBundle.length());
 
             return ExchangeResponseDTO.builder()
@@ -235,7 +231,7 @@ public class HIEGatewayService {
                 .build();
 
         } catch (Exception e) {
-            auditService.markFailed(auditId, e.getMessage());
+            notificationAuditClient.markTransferFailed(auditId, e.getMessage());
             throw e;
         }
     }
@@ -338,8 +334,8 @@ public class HIEGatewayService {
     }
 
     private String resolveHipForPatient(String abhaId, String preferredHip) {
-        boolean hasHospitalAConsult = hospitalAOPConsultRepository.findFirstByAbhaIdOrderByIdDesc(abhaId).isPresent();
-        boolean hasHospitalBConsult = hospitalBOPConsultRepository.findFirstByAbhaIdOrderByReceivedAtDesc(abhaId).isPresent();
+        boolean hasHospitalAConsult = hospitalDataClient.hasConsults("HospitalA", abhaId);
+        boolean hasHospitalBConsult = hospitalDataClient.hasConsults("HospitalB", abhaId);
 
         if (preferredHip != null && !preferredHip.isBlank()) {
             if ("HospitalA".equalsIgnoreCase(preferredHip) && hasHospitalAConsult) {

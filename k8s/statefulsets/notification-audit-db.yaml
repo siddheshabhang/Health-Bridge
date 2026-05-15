@@ -1,0 +1,93 @@
+# notification-audit-db — PostgreSQL StatefulSet + Service
+# Shared by: notification-audit-service, hospital-b-service (support), admin-reporting-service
+# Phase 8 — M1 MacBook Air resources: 128Mi/256Mi, 100m/250m
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: notification-audit-db
+  namespace: health-bridge
+  labels:
+    app: notification-audit-db
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  serviceName: notification-audit-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-audit-db
+  template:
+    metadata:
+      labels:
+        app: notification-audit-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: notification_audit_db
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: health-bridge-secrets
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d notification_audit_db
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U $(POSTGRES_USER) -d notification_audit_db
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          volumeMounts:
+            - name: notification-audit-db-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: notification-audit-db-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-audit-db
+  namespace: health-bridge
+  labels:
+    app: notification-audit-db
+    app.kubernetes.io/part-of: health-bridge
+spec:
+  selector:
+    app: notification-audit-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None

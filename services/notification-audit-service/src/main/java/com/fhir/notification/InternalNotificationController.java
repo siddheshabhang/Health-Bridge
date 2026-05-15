@@ -17,12 +17,15 @@ public class InternalNotificationController {
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Service-Token";
 
     private final PatientPushNotificationRepository notificationRepository;
+    private final NotificationService notificationService;
     private final String internalServiceToken;
 
     public InternalNotificationController(
             PatientPushNotificationRepository notificationRepository,
+            NotificationService notificationService,
             @Value("${app.internal.service-token}") String internalServiceToken) {
         this.notificationRepository = notificationRepository;
+        this.notificationService = notificationService;
         this.internalServiceToken = internalServiceToken;
     }
 
@@ -49,5 +52,19 @@ public class InternalNotificationController {
         notification.setRead(false);
 
         return notificationRepository.save(notification);
+    }
+
+    @PostMapping("/consent-request")
+    public void notifyConsentRequest(
+            @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String serviceToken,
+            @RequestBody ConsentNotificationRequest request) {
+        if (!internalServiceToken.equals(serviceToken)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid internal service token.");
+        }
+
+        notificationService.notifyPatientConsentRequest(request.patientId(), request.consentRequestId());
+    }
+
+    private record ConsentNotificationRequest(String patientId, Long consentRequestId) {
     }
 }
